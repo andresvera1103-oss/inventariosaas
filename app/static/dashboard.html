@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>InventarioSaaS - Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">InventarioSaaS</div>
+  <nav>
+    <a href="/dashboard.html" class="active">Dashboard</a>
+    <a href="/inventario.html">Inventario</a>
+    <a href="/ventas.html">Ventas</a>
+  </nav>
+  <div class="user">
+    <span id="userLabel">...</span>
+    <button onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</div>
+
+<main>
+  <div class="cards">
+    <div class="card"><div class="label">Total productos</div><div class="value" id="kpiTotal">-</div></div>
+    <div class="card"><div class="label">Productos con stock bajo</div><div class="value" id="kpiBajo">-</div></div>
+    <div class="card"><div class="label">Valor total del inventario</div><div class="value" id="kpiValor">-</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Alertas de stock bajo</h2>
+    <table>
+      <thead><tr><th>Producto</th><th>Stock actual</th><th>Stock mínimo</th></tr></thead>
+      <tbody id="tablaAlertas"><tr><td colspan="3">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+async function verificarSesion() {
+  const res = await fetch('/api/session');
+  const s = await res.json();
+  if (!s.autenticado) { window.location.href = '/'; return; }
+  document.getElementById('userLabel').innerText = `${s.nombre} · ${s.rol}`;
+}
+
+async function cerrarSesion() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/';
+}
+
+async function cargarResumen() {
+  const res = await fetch('/api/reportes/resumen');
+  const r = await res.json();
+  document.getElementById('kpiTotal').innerText = r.total_productos;
+  document.getElementById('kpiBajo').innerText = r.productos_con_stock_bajo;
+  document.getElementById('kpiValor').innerText = '$' + r.valor_total_inventario.toFixed(2);
+}
+
+async function cargarAlertas() {
+  const res = await fetch('/api/productos');
+  const productos = await res.json();
+  const bajos = productos.filter(p => p.stock <= p.stock_minimo);
+  const tbody = document.getElementById('tablaAlertas');
+  tbody.innerHTML = '';
+  if (bajos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3">No hay productos con stock bajo.</td></tr>';
+    return;
+  }
+  bajos.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.className = 'low-stock';
+    tr.innerHTML = `<td>${p.nombre} <span class="badge">Stock bajo</span></td><td>${p.stock}</td><td>${p.stock_minimo}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+verificarSesion();
+cargarResumen();
+cargarAlertas();
+</script>
+</body>
+</html>

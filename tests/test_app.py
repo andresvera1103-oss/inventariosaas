@@ -87,3 +87,33 @@ def test_registrar_venta_stock_insuficiente(client):
 
     res = client.post(f"/api/productos/{creado['id']}/venta", json={"cantidad": 5})
     assert res.status_code == 400
+
+
+def test_login_exitoso(client):
+    res = client.post("/api/login", json={
+        "email": "admin@inventario.com", "password": "admin123"
+    })
+    assert res.status_code == 200
+    assert res.get_json()["usuario"]["rol"] == "admin"
+
+
+def test_login_credenciales_invalidas(client):
+    res = client.post("/api/login", json={
+        "email": "admin@inventario.com", "password": "incorrecta"
+    })
+    assert res.status_code == 401
+
+
+def test_session_y_logout(client):
+    res = client.get("/api/session")
+    assert res.get_json()["autenticado"] is False
+
+    client.post("/api/login", json={
+        "email": "vendedor@inventario.com", "password": "vendedor123"
+    })
+    res = client.get("/api/session")
+    assert res.get_json()["autenticado"] is True
+
+    client.post("/api/logout")
+    res = client.get("/api/session")
+    assert res.get_json()["autenticado"] is False

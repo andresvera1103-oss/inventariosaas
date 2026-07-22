@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>InventarioSaaS - Inventario</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">InventarioSaaS</div>
+  <nav>
+    <a href="/dashboard.html">Dashboard</a>
+    <a href="/inventario.html" class="active">Inventario</a>
+    <a href="/ventas.html">Ventas</a>
+  </nav>
+  <div class="user">
+    <span id="userLabel">...</span>
+    <button onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</div>
+
+<main>
+  <div class="panel">
+    <h2>Agregar producto</h2>
+    <form id="formProducto" class="inline">
+      <input type="text" id="nombre" placeholder="Nombre del producto" required>
+      <input type="number" id="precio" placeholder="Precio" step="0.01" required>
+      <input type="number" id="stock" placeholder="Stock" required>
+      <input type="number" id="stock_minimo" placeholder="Stock mínimo" value="5">
+      <button type="submit">Agregar producto</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Productos en inventario</h2>
+    <table>
+      <thead><tr><th>Producto</th><th>Precio</th><th>Stock</th><th>Mínimo</th><th></th></tr></thead>
+      <tbody id="tablaProductos"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+async function verificarSesion() {
+  const res = await fetch('/api/session');
+  const s = await res.json();
+  if (!s.autenticado) { window.location.href = '/'; return; }
+  document.getElementById('userLabel').innerText = `${s.nombre} · ${s.rol}`;
+}
+
+async function cerrarSesion() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/';
+}
+
+async function cargarProductos() {
+  const res = await fetch('/api/productos');
+  const productos = await res.json();
+  const tbody = document.getElementById('tablaProductos');
+  tbody.innerHTML = '';
+  productos.forEach(p => {
+    const bajo = p.stock <= p.stock_minimo;
+    const tr = document.createElement('tr');
+    if (bajo) tr.className = 'low-stock';
+    tr.innerHTML = `
+      <td>${p.nombre} ${bajo ? '<span class="badge">Stock bajo</span>' : ''}</td>
+      <td>$${p.precio.toFixed(2)}</td>
+      <td>${p.stock}</td>
+      <td>${p.stock_minimo}</td>
+      <td><button class="del" onclick="eliminarProducto(${p.id})">Eliminar</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function eliminarProducto(id) {
+  await fetch(`/api/productos/${id}`, { method: 'DELETE' });
+  cargarProductos();
+}
+
+document.getElementById('formProducto').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {
+    nombre: document.getElementById('nombre').value,
+    precio: parseFloat(document.getElementById('precio').value),
+    stock: parseInt(document.getElementById('stock').value),
+    stock_minimo: parseInt(document.getElementById('stock_minimo').value || 5),
+  };
+  await fetch('/api/productos', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  e.target.reset();
+  cargarProductos();
+});
+
+verificarSesion();
+cargarProductos();
+</script>
+</body>
+</html>

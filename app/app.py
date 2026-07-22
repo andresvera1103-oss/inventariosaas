@@ -5,13 +5,14 @@ Módulo principal: Gestión de Inventario (CRUD de productos)
 Proyecto final de materia - Implementación básica del módulo principal
 Stack: Flask + SQLite
 """
-from flask import Flask, jsonify, request, g, send_from_directory
+from flask import Flask, jsonify, request, g, send_from_directory, session
 import sqlite3
 import os
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "inventario.db")
 
 app = Flask(__name__, static_folder="static")
+app.secret_key = os.environ.get("SECRET_KEY", "clave-de-desarrollo-inventariosaas")
 
 
 def get_db():
@@ -41,8 +42,70 @@ def init_db():
         )
         """
     )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            nombre TEXT NOT NULL,
+            rol TEXT NOT NULL DEFAULT 'vendedor'
+        )
+        """
+    )
+    existe = db.execute("SELECT COUNT(*) c FROM usuarios").fetchone()[0]
+    if existe == 0:
+        db.executemany(
+            "INSERT INTO usuarios (email, password, nombre, rol) VALUES (?, ?, ?, ?)",
+            [
+                ("admin@inventario.com", "admin123", "Administrador Demo", "admin"),
+                ("vendedor@inventario.com", "vendedor123", "Vendedor Demo", "vendedor"),
+            ],
+        )
     db.commit()
     db.close()
+
+
+# ---------- Autenticación ----------
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.get_json(force=True)
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    db = get_db()
+    usuario = db.execute(
+        "SELECT * FROM usuarios WHERE email = ? AND password = ?", (email, password)
+    ).fetchone()
+
+    if usuario is None:
+        return jsonify({"error": "Credenciales inválidas"}), 401
+
+    session["usuario_id"] = usuario["id"]
+    session["usuario_nombre"] = usuario["nombre"]
+    session["usuario_rol"] = usuario["rol"]
+    return jsonify({
+        "mensaje": "Sesión iniciada",
+        "usuario": {"nombre": usuario["nombre"], "rol": usuario["rol"]},
+    })
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"mensaje": "Sesión cerrada"})
+
+
+@app.route("/api/session", methods=["GET"])
+def get_session():
+    if "usuario_id" not in session:
+        return jsonify({"autenticado": False}), 200
+    return jsonify({
+        "autenticado": True,
+        "nombre": session.get("usuario_nombre"),
+        "rol": session.get("usuario_rol"),
+    })
 
 
 # ---------- Rutas de la API REST ----------
@@ -177,7 +240,22 @@ def resumen_dashboard():
 
 @app.route("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    return send_from_directory(app.static_folder, "login.html")
+
+
+@app.route("/dashboard.html")
+def pagina_dashboard():
+    return send_from_directory(app.static_folder, "dashboard.html")
+
+
+@app.route("/inventario.html")
+def pagina_inventario():
+    return send_from_directory(app.static_folder, "inventario.html")
+
+
+@app.route("/ventas.html")
+def pagina_ventas():
+    return send_from_directory(app.static_folder, "ventas.html")
 
 
 @app.route("/health")

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>InventarioSaaS - Iniciar sesión</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <div class="logo-dot">IS</div>
+    <h1>InventarioSaaS</h1>
+    <p class="sub">Gestión de inventarios para pequeñas empresas</p>
+
+    <div id="alertBox"></div>
+
+    <form id="formLogin">
+      <input type="email" id="email" placeholder="Correo electrónico" required>
+      <input type="password" id="password" placeholder="Contraseña" required>
+      <button type="submit">Iniciar sesión</button>
+    </form>
+
+    <div class="demo-hint">
+      <b>Usuarios de demostración:</b><br>
+      admin@inventario.com / admin123<br>
+      vendedor@inventario.com / vendedor123
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('formLogin').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const alertBox = document.getElementById('alertBox');
+  alertBox.innerHTML = '';
+
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (res.ok) {
+    window.location.href = '/dashboard.html';
+  } else {
+    const data = await res.json();
+    alertBox.innerHTML = `<div class="alert error">${data.error || 'No se pudo iniciar sesión'}</div>`;
+  }
+});
+</script>
+</body>
+</html>

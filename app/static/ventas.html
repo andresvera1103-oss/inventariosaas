@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>InventarioSaaS - Registrar venta</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">InventarioSaaS</div>
+  <nav>
+    <a href="/dashboard.html">Dashboard</a>
+    <a href="/inventario.html">Inventario</a>
+    <a href="/ventas.html" class="active">Ventas</a>
+  </nav>
+  <div class="user">
+    <span id="userLabel">...</span>
+    <button onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</div>
+
+<main style="max-width:480px;">
+  <div class="panel">
+    <h2>Registrar nueva venta</h2>
+    <div id="alertBox"></div>
+
+    <label style="font-size:13px;color:var(--muted);">Producto</label>
+    <select id="producto" style="width:100%;margin:6px 0 14px;padding:9px;"></select>
+
+    <div class="stepper">
+      <button type="button" onclick="cambiarCantidad(-1)">−</button>
+      <div class="qty" id="cantidad">1</div>
+      <button type="button" onclick="cambiarCantidad(1)">+</button>
+    </div>
+
+    <p style="text-align:center;color:var(--muted);font-size:13px;">
+      Precio unitario: <b id="precioUnitario">$0.00</b><br>
+      Total: <b id="totalVenta" style="color:var(--navy);font-size:18px;">$0.00</b>
+    </p>
+
+    <button style="width:100%;" onclick="confirmarVenta()">Confirmar venta</button>
+  </div>
+</main>
+
+<script>
+let productos = [];
+let cantidad = 1;
+
+async function verificarSesion() {
+  const res = await fetch('/api/session');
+  const s = await res.json();
+  if (!s.autenticado) { window.location.href = '/'; return; }
+  document.getElementById('userLabel').innerText = `${s.nombre} · ${s.rol}`;
+}
+
+async function cerrarSesion() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/';
+}
+
+async function cargarProductos() {
+  const res = await fetch('/api/productos');
+  productos = await res.json();
+  const select = document.getElementById('producto');
+  select.innerHTML = productos.map(p => `<option value="${p.id}">${p.nombre} (stock: ${p.stock})</option>`).join('');
+  actualizarTotales();
+}
+
+function cambiarCantidad(delta) {
+  cantidad = Math.max(1, cantidad + delta);
+  document.getElementById('cantidad').innerText = cantidad;
+  actualizarTotales();
+}
+
+function actualizarTotales() {
+  const id = parseInt(document.getElementById('producto').value);
+  const p = productos.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('precioUnitario').innerText = '$' + p.precio.toFixed(2);
+  document.getElementById('totalVenta').innerText = '$' + (p.precio * cantidad).toFixed(2);
+}
+
+document.getElementById('producto').addEventListener('change', actualizarTotales);
+
+async function confirmarVenta() {
+  const id = parseInt(document.getElementById('producto').value);
+  const alertBox = document.getElementById('alertBox');
+  alertBox.innerHTML = '';
+
+  const res = await fetch(`/api/productos/${id}/venta`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ cantidad }),
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    let msg = `Venta registrada. Stock restante: ${data.stock_restante}.`;
+    alertBox.innerHTML = `<div class="alert ok">${msg}</div>`;
+    if (data.alerta_stock_bajo) {
+      alertBox.innerHTML += `<div class="alert error">⚠ Este producto quedó con stock bajo.</div>`;
+    }
+    cantidad = 1;
+    document.getElementById('cantidad').innerText = 1;
+    cargarProductos();
+  } else {
+    alertBox.innerHTML = `<div class="alert error">${data.error}</div>`;
+  }
+}
+
+verificarSesion();
+cargarProductos();
+</script>
+</body>
+</html>
