@@ -58,8 +58,8 @@ def init_db():
         db.executemany(
             "INSERT INTO usuarios (email, password, nombre, rol) VALUES (?, ?, ?, ?)",
             [
-                ("admin@inventario.com", "admin123", "Administrador Demo", "admin"),
-                ("vendedor@inventario.com", "vendedor123", "Vendedor Demo", "vendedor"),
+                ("admin@inventario.com", "admin123", "Administrador ", "admin"),
+                ("vendedor@inventario.com", "vendedor123", "Vendedor ", "vendedor"),
             ],
         )
     db.commit()
