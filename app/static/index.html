@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>InventarioSaaS - Panel de Inventario</title>
+<style>
+  :root { --navy:#1F3864; --blue:#2E5C8A; --light:#DCE6F1; --danger:#c0392b; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; margin:0; background:#f5f7fa; color:#222; }
+  header { background: var(--navy); color:#fff; padding:18px 28px; }
+  header h1 { margin:0; font-size:20px; }
+  main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+  .cards { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .card { background:#fff; border-radius:10px; padding:16px 20px; flex:1; min-width:180px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .card .label { font-size:12px; color:#777; text-transform:uppercase; }
+  .card .value { font-size:26px; font-weight:700; color:var(--navy); margin-top:4px; }
+  .panel { background:#fff; border-radius:10px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  form { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  input { padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
+  button { background: var(--blue); color:#fff; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-size:14px; }
+  button.del { background: var(--danger); }
+  table { width:100%; border-collapse: collapse; margin-top:10px; }
+  th, td { text-align:left; padding:10px; border-bottom:1px solid #eee; font-size:14px; }
+  th { color:#555; text-transform:uppercase; font-size:11px; }
+  tr.low-stock { background: #fdecea; }
+  .badge { background:var(--danger); color:#fff; padding:2px 8px; border-radius:10px; font-size:11px; }
+</style>
+</head>
+<body>
+<header><h1>InventarioSaaS · Panel de Gestión de Inventario</h1></header>
+<main>
+  <div class="cards">
+    <div class="card"><div class="label">Total productos</div><div class="value" id="kpiTotal">-</div></div>
+    <div class="card"><div class="label">Stock bajo</div><div class="value" id="kpiBajo">-</div></div>
+    <div class="card"><div class="label">Valor del inventario</div><div class="value" id="kpiValor">-</div></div>
+  </div>
+
+  <div class="panel">
+    <form id="formProducto">
+      <input type="text" id="nombre" placeholder="Nombre del producto" required>
+      <input type="number" id="precio" placeholder="Precio" step="0.01" required>
+      <input type="number" id="stock" placeholder="Stock" required>
+      <input type="number" id="stock_minimo" placeholder="Stock mínimo" value="5">
+      <button type="submit">Agregar producto</button>
+    </form>
+
+    <table>
+      <thead><tr><th>Producto</th><th>Precio</th><th>Stock</th><th>Mínimo</th><th></th></tr></thead>
+      <tbody id="tablaProductos"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+async function cargarProductos() {
+  const res = await fetch('/api/productos');
+  const productos = await res.json();
+  const tbody = document.getElementById('tablaProductos');
+  tbody.innerHTML = '';
+  productos.forEach(p => {
+    const bajo = p.stock <= p.stock_minimo;
+    const tr = document.createElement('tr');
+    if (bajo) tr.className = 'low-stock';
+    tr.innerHTML = `
+      <td>${p.nombre} ${bajo ? '<span class="badge">Stock bajo</span>' : ''}</td>
+      <td>$${p.precio.toFixed(2)}</td>
+      <td>${p.stock}</td>
+      <td>${p.stock_minimo}</td>
+      <td><button class="del" onclick="eliminarProducto(${p.id})">Eliminar</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  cargarResumen();
+}
+
+async function cargarResumen() {
+  const res = await fetch('/api/reportes/resumen');
+  const r = await res.json();
+  document.getElementById('kpiTotal').innerText = r.total_productos;
+  document.getElementById('kpiBajo').innerText = r.productos_con_stock_bajo;
+  document.getElementById('kpiValor').innerText = '$' + r.valor_total_inventario.toFixed(2);
+}
+
+async function eliminarProducto(id) {
+  await fetch(`/api/productos/${id}`, { method: 'DELETE' });
+  cargarProductos();
+}
+
+document.getElementById('formProducto').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {
+    nombre: document.getElementById('nombre').value,
+    precio: parseFloat(document.getElementById('precio').value),
+    stock: parseInt(document.getElementById('stock').value),
+    stock_minimo: parseInt(document.getElementById('stock_minimo').value || 5),
+  };
+  await fetch('/api/productos', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  e.target.reset();
+  cargarProductos();
+});
+
+cargarProductos();
+</script>
+</body>
+</html>
